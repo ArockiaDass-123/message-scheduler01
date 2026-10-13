@@ -25,7 +25,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   // Optional collapsible developer fallback login for local testing when offline
   const [showDevLogin, setShowDevLogin] = useState(false);
-  const [devEmail, setDevEmail] = useState('admin@scheduler.local');
+  const [devEmail, setDevEmail] = useState('arockiadass123@gmail.com');
   const [devPassword, setDevPassword] = useState('admin123');
   const [devLoading, setDevLoading] = useState(false);
 
@@ -65,14 +65,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  // Developer fallback login (only used if developer wants to test locally before OAuth credentials)
   const handleDevSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setDevLoading(true);
     setError(null);
     try {
-      const res = await api.login(devEmail, devPassword);
-      onLoginSuccess(res.user);
+      try {
+        const res = await api.login(devEmail, devPassword);
+        onLoginSuccess(res.user);
+        return;
+      } catch (loginErr: any) {
+        if (loginErr.message?.includes('Incorrect email') || loginErr.message?.includes('not found')) {
+          const regRes = await api.register(devEmail, devPassword, 'Arockiadass');
+          onLoginSuccess(regRes.user);
+          return;
+        }
+        throw loginErr;
+      }
     } catch (err: any) {
       setError(err.message || 'Developer demo login failed');
     } finally {
@@ -186,7 +195,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   disabled={devLoading}
                   className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
                 >
-                  <span>{devLoading ? 'Signing in...' : 'Sign In with Demo Admin'}</span>
+                  <span>{devLoading ? 'Signing in...' : 'Sign In as Arockiadass'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </form>
