@@ -177,7 +177,7 @@ def configure_google_credentials(cfg: GoogleConfigIn):
 
 @router.get("/google/url")
 def get_google_auth_url(redirect_uri: Optional[str] = None):
-    """Generates official Google OAuth authorization URL requesting email, profile, and gmail.send scopes."""
+    """Generates official Google OAuth authorization URL requesting email and profile scopes (non-sensitive, no Google verification needed)."""
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_ID.strip():
         return {
             "configured": False,
@@ -192,8 +192,7 @@ def get_google_auth_url(redirect_uri: Optional[str] = None):
     scopes = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/userinfo.profile",
-        "https://www.googleapis.com/auth/gmail.send"
+        "https://www.googleapis.com/auth/userinfo.profile"
     ]
     scope_str = "%20".join(scopes)
     state = secrets.token_urlsafe(16)
@@ -241,8 +240,7 @@ def process_google_oauth_code(code: str, redirect_uri: Optional[str], db: Sessio
             scopes=[
                 "openid",
                 "https://www.googleapis.com/auth/userinfo.email",
-                "https://www.googleapis.com/auth/userinfo.profile",
-                "https://www.googleapis.com/auth/gmail.send"
+                "https://www.googleapis.com/auth/userinfo.profile"
             ],
         )
         flow.redirect_uri = cb_uri

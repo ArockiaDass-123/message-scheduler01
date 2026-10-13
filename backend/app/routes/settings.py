@@ -72,7 +72,7 @@ def get_google_auth_url(current_user: models.User = Depends(get_current_user)):
         }
 
     redirect_uri = settings.GOOGLE_REDIRECT_URI
-    scope = "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email"
+    scope = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={settings.GOOGLE_CLIENT_ID}&"
