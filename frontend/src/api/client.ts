@@ -2,12 +2,20 @@ import { User, Workspace, WorkspaceDetail, Recipient, Schedule, MessageLog, Inte
 
 const getApiBase = (): string => {
   const raw = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
-  if (!raw) return '/api';
-  let url = raw;
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = `https://${url}`;
+  if (raw) {
+    let url = raw;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+    return url.endsWith('/api') ? url : `${url.replace(/\/+$/, '')}/api`;
   }
-  return url.endsWith('/api') ? url : `${url.replace(/\/+$/, '')}/api`;
+
+  // When deployed to Vercel or any non-localhost host, use the live Render backend
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    return 'https://message-scheduler01.onrender.com/api';
+  }
+
+  return '/api';
 };
 
 const API_BASE = getApiBase();
