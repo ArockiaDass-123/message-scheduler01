@@ -8,7 +8,12 @@ import {
   ArrowRight,
   Lock,
   Mail,
-  Info
+  Info,
+  Settings,
+  X,
+  Check,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 
 interface LoginPageProps {
@@ -23,6 +28,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('arockiadass123@gmail.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
+
+  // Google OAuth configuration modal state
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [cfgClientId, setCfgClientId] = useState('');
+  const [cfgClientSecret, setCfgClientSecret] = useState('');
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [copiedRedirect, setCopiedRedirect] = useState(false);
 
   // Check for OAuth redirect errors on mount
   useEffect(() => {
@@ -74,14 +86,51 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         window.location.href = statusRes.auth_url;
       } else {
         setAdminNotice(
-          'Google Cloud OAuth is not yet configured on your server. You can sign in directly using the email form above, then connect Gmail in Settings!'
+          'Google Cloud OAuth Client ID is not yet connected to the backend. Click "Configure Google OAuth" below to connect it now.'
         );
+        setShowConfigModal(true);
       }
     } catch (err: any) {
       setError(err.message || 'Unable to connect to Google authentication service.');
     } finally {
       setGoogleLoading(false);
     }
+  };
+
+  // Save Google OAuth credentials
+  const handleSaveGoogleConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cfgClientId.trim() || !cfgClientSecret.trim()) {
+      setError('Please provide both Client ID and Client Secret from your Google Cloud Console.');
+      return;
+    }
+
+    setSavingConfig(true);
+    setError(null);
+    try {
+      await api.configureGoogleOAuth(
+        cfgClientId.trim(),
+        cfgClientSecret.trim(),
+        window.location.origin
+      );
+      setShowConfigModal(false);
+      setAdminNotice(null);
+      // Immediately launch Google Sign In flow!
+      const statusRes = await api.getGoogleLoginUrl(window.location.origin);
+      if (statusRes.configured && statusRes.auth_url) {
+        window.location.href = statusRes.auth_url;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to save Google credentials.');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const copyRedirectUri = () => {
+    navigator.clipboard.writeText(window.location.origin);
+    setCopiedRedirect(true);
+    setTimeout(() => setCopiedRedirect(false), 2500);
   };
 
   return (
@@ -112,11 +161,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* Admin Notice */}
+          {/* Admin Notice with Configure Button */}
           {adminNotice && (
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 font-medium flex items-start gap-2.5">
-              <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <span>{adminNotice}</span>
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 font-medium space-y-2">
+              <div className="flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <span>{adminNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Configure Google Client ID & Secret</span>
+              </button>
             </div>
           )}
 
@@ -204,9 +263,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <span>{googleLoading ? 'Connecting...' : 'Continue with Google'}</span>
             </button>
 
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] text-slate-500">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>Official Google OAuth 2.0 & Gmail API Support</span>
+            <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                Gmail API OAuth 2.0
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(true)}
+                className="text-brand-600 hover:text-brand-700 font-semibold underline flex items-center gap-1"
+              >
+                <Settings className="w-3 h-3" />
+                Setup Google Credentials
+              </button>
             </div>
           </div>
 
@@ -219,6 +288,107 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </div>
 
       </div>
+
+      {/* Google OAuth Configuration Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-lg">Connect Google Cloud Credentials</h3>
+                  <p className="text-xs text-slate-500">From your open Google Cloud Console tab</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Instruction Checklist */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5 text-xs text-slate-700">
+              <p className="font-bold text-slate-900">In your Google Cloud Console tab:</p>
+              <div className="space-y-1.5">
+                <div>1. Set <strong>Authorized JavaScript origins</strong>:</div>
+                <div className="flex items-center gap-2 font-mono text-[11px] bg-white p-2 rounded-lg border border-slate-200">
+                  <span className="truncate">{window.location.origin}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div>2. Set <strong>Authorized redirect URIs</strong>:</div>
+                <div className="flex items-center justify-between font-mono text-[11px] bg-white p-2 rounded-lg border border-slate-200">
+                  <span className="truncate">{window.location.origin}</span>
+                  <button
+                    type="button"
+                    onClick={copyRedirectUri}
+                    className="ml-2 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-sans font-semibold flex items-center gap-1 text-slate-700"
+                  >
+                    {copiedRedirect ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedRedirect ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveGoogleConfig} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Client ID <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 123456789-xxxxxxxx.apps.googleusercontent.com"
+                  value={cfgClientId}
+                  onChange={(e) => setCfgClientId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Client Secret <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="e.g. GOCSPX-xxxxxxxxxxxxxxxx"
+                  value={cfgClientSecret}
+                  onChange={(e) => setCfgClientSecret(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowConfigModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingConfig}
+                  className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-bold shadow-lg shadow-brand-500/25 flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  <span>{savingConfig ? 'Saving...' : 'Save & Continue with Google'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
