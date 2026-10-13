@@ -194,7 +194,7 @@ def get_google_auth_url(redirect_uri: Optional[str] = None):
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
-        "https://mail.google.com/"
+        "https://www.googleapis.com/auth/gmail.send"
     ]
     scope_str = "%20".join(scopes)
     state = secrets.token_urlsafe(16)
@@ -243,7 +243,7 @@ def process_google_oauth_code(code: str, redirect_uri: Optional[str], db: Sessio
                 "openid",
                 "https://www.googleapis.com/auth/userinfo.email",
                 "https://www.googleapis.com/auth/userinfo.profile",
-                "https://mail.google.com/"
+                "https://www.googleapis.com/auth/gmail.send"
             ],
         )
         flow.redirect_uri = cb_uri
