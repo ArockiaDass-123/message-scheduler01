@@ -182,10 +182,11 @@ def get_google_auth_url(redirect_uri: Optional[str] = None):
         return {
             "configured": False,
             "auth_url": "",
-            "message": "Google OAuth 2.0 requires backend configuration. System administrator: Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to backend/.env."
+            "message": "Google OAuth 2.0 is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as environment variables on the backend server."
         }
 
-    cb_uri = redirect_uri or settings.GOOGLE_REDIRECT_URI or "http://localhost:3000"
+    # Use the redirect_uri from the frontend request (their origin), fallback to configured setting
+    cb_uri = redirect_uri or settings.GOOGLE_REDIRECT_URI or "https://message-scheduler01.vercel.app"
     # Normalize: strip trailing slashes to avoid redirect_uri mismatch during token exchange
     cb_uri = cb_uri.rstrip("/")
     
@@ -220,7 +221,7 @@ def get_google_auth_url(redirect_uri: Optional[str] = None):
 
 def process_google_oauth_code(code: str, redirect_uri: Optional[str], db: Session):
     """Exchanges Google code, logs in or registers user, and connects Gmail automatically."""
-    cb_uri = redirect_uri or settings.GOOGLE_REDIRECT_URI or "http://localhost:3000"
+    cb_uri = redirect_uri or settings.GOOGLE_REDIRECT_URI or "https://message-scheduler01.vercel.app"
     # Normalize redirect_uri: strip trailing slashes to avoid mismatch
     cb_uri = cb_uri.rstrip("/")
     
