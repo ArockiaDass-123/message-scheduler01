@@ -157,11 +157,12 @@ class EmailService:
         sender_email: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Sends an email using SMTP with OAuth2 XOAUTH2 authentication.
-        This approach does NOT require the restricted gmail.send scope —
-        it uses the standard OAuth2 access_token to authenticate via SMTP,
-        so the app works for ALL Google users without verification.
+        Sends an email using the Gmail REST API over HTTPS (port 443).
+        This works on Render free tier where outbound SMTP (port 587/465) is blocked.
+        Requires https://mail.google.com/ or https://www.googleapis.com/auth/gmail.send scope.
         """
+        import httpx
+
         if not credentials_dict or not credentials_dict.get("access_token"):
             raise ValueError("Gmail account is not connected. Please connect Gmail in Settings.")
 
@@ -169,10 +170,10 @@ class EmailService:
         if not sender:
             raise ValueError("No sender email configured. Please reconnect your Gmail account.")
 
-        # Refresh the token if we have refresh_token credentials
+        # Refresh the access token if expired
         access_token = credentials_dict.get("access_token")
         refreshed_token = None
-        
+
         if credentials_dict.get("refresh_token") and credentials_dict.get("client_id"):
             try:
                 creds = Credentials(
@@ -181,19 +182,16 @@ class EmailService:
                     token_uri=credentials_dict.get("token_uri", "https://oauth2.googleapis.com/token"),
                     client_id=credentials_dict.get("client_id"),
                     client_secret=credentials_dict.get("client_secret"),
-                    scopes=None
+                    scopes=None,
                 )
                 if creds.expired or not creds.valid:
                     creds.refresh(Request())
                     access_token = creds.token
                     refreshed_token = access_token
             except Exception:
-                pass  # Will try with existing token
+                pass  # Try with existing token
 
-        # Build XOAUTH2 authentication string
-        auth_string = f"user={sender}\x01auth=Bearer {access_token}\x01\x01"
-        
-        # Build email message
+        # Build MIME email
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = formataddr(("Message Scheduler", sender))
@@ -222,35 +220,41 @@ class EmailService:
         msg.attach(part1)
         msg.attach(part2)
 
-        # Send via SMTP with XOAUTH2 authentication
+        # Encode as base64url for Gmail API
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+
+        # Send via Gmail REST API (HTTPS port 443 — works on Render free tier)
         try:
-            context = ssl.create_default_context()
-            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
-                server.ehlo()
-                server.starttls(context=context)
-                server.ehlo()
-                # Authenticate using XOAUTH2 with OAuth access token
-                server.auth("XOAUTH2", lambda: auth_string)
-                server.sendmail(sender, [to_email.strip()], msg.as_string())
-        except smtplib.SMTPAuthenticationError as e:
-            err_str = str(e)
-            if "Username and Password not accepted" in err_str or "534" in err_str:
+            resp = httpx.post(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"raw": raw},
+                timeout=30,
+            )
+            if resp.status_code == 401:
                 raise Exception(
-                    "Gmail SMTP authentication failed. This may happen if: "
-                    "(1) Your OAuth session expired — please sign out and sign in again with Google, or "
-                    "(2) Less secure app access is blocked — try reconnecting with a Google App Password in Settings."
+                    "Gmail authentication failed (401). Please sign out and sign in again with Google to refresh permissions."
                 )
-            raise Exception(f"Gmail SMTP authentication error: {err_str}")
-        except Exception as e:
-            raise Exception(f"Gmail email delivery failed: {str(e)}")
+            if resp.status_code == 403:
+                raise Exception(
+                    "Gmail permission denied (403). Please sign out and sign in again — make sure to allow Gmail send permission."
+                )
+            if not resp.is_success:
+                error_detail = resp.json().get("error", {}).get("message", resp.text)
+                raise Exception(f"Gmail API error {resp.status_code}: {error_detail}")
+        except httpx.RequestError as e:
+            raise Exception(f"Gmail API network error: {str(e)}")
 
         return {
             "status": "success",
-            "mode": "smtp_xoauth2",
+            "mode": "gmail_api",
             "sender": sender,
             "recipient": to_email.strip(),
             "sent_at": datetime.utcnow().isoformat(),
-            "refreshed_token": refreshed_token
+            "refreshed_token": refreshed_token,
         }
 
     @staticmethod
