@@ -3,6 +3,19 @@ import { Workspace } from '../types';
 import { Clock, Users, Calendar, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
+const ensureUtc = (iso: string): string =>
+  iso && !iso.endsWith('Z') && !iso.includes('+') ? iso + 'Z' : iso;
+
+const fmtIst = (iso: string, opts: Intl.DateTimeFormatOptions): string => {
+  try {
+    return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', ...opts }).format(
+      new Date(ensureUtc(iso))
+    );
+  } catch {
+    return format(new Date(iso), 'dd MMM yyyy, h:mm a');
+  }
+};
+
 interface WorkspaceCardProps {
   workspace: Workspace;
   onOpen: (id: number) => void;
@@ -10,7 +23,10 @@ interface WorkspaceCardProps {
 
 export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onOpen }) => {
   const nextDateFormatted = workspace.next_scheduled_at
-    ? format(new Date(workspace.next_scheduled_at), 'dd MMM yyyy, h:mm a')
+    ? fmtIst(workspace.next_scheduled_at, {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+      })
     : 'None scheduled';
 
   return (

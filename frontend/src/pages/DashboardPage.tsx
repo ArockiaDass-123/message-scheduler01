@@ -4,6 +4,21 @@ import { WorkspaceCard } from '../components/WorkspaceCard';
 import { Plus, Clock, CheckCircle2, Calendar, AlertCircle, ArrowRight, ShieldCheck, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 
+// Ensure ISO string is treated as UTC (append Z if missing)
+const ensureUtc = (iso: string): string =>
+  iso && !iso.endsWith('Z') && !iso.includes('+') ? iso + 'Z' : iso;
+
+// Format a UTC ISO string in Asia/Kolkata timezone
+const fmtIst = (iso: string, opts: Intl.DateTimeFormatOptions): string => {
+  try {
+    return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', ...opts }).format(
+      new Date(ensureUtc(iso))
+    );
+  } catch {
+    return format(new Date(iso), 'dd MMM yyyy, hh:mm a');
+  }
+};
+
 interface DashboardPageProps {
   workspaces: Workspace[];
   summary: DashboardSummary | null;
@@ -145,7 +160,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-800">{s.workspace_name}</span>
                     <span className="text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                      {format(new Date(s.scheduled_at), 'hh:mm a')}
+                      {fmtIst(s.scheduled_at, { hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
@@ -189,7 +204,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-800 truncate">{s.workspace_name}</span>
                     <span className="text-slate-600 font-semibold ml-2">
-                      {format(new Date(s.scheduled_at), 'dd MMM, hh:mm a')}
+                      {fmtIst(s.scheduled_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
@@ -246,7 +261,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     </div>
                     <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
                       <span>{s.recipient_count} recipients</span>
-                      <span>{format(new Date(s.scheduled_at), 'dd MMM yyyy')}</span>
+                      <span>{fmtIst(s.scheduled_at, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
                   </div>
                 );
